@@ -25,6 +25,7 @@ mWebview.evaluateJavascript("javascript: func()", new ValueCallback<String>() {
 });
 ```
 两种方法的对比如下表：
+
 | 方法名 | 优点 | 缺点 |
 | ------ | ------ | ------ |
 | loadUrl | 兼容性好 | 1. 会刷新页面 2. 无法获取js方法执行结果 |
