@@ -29,7 +29,7 @@ mWebview.evaluateJavascript("javascript: func()", new ValueCallback<String>() {
 | 方法名 | 优点 | 缺点 |
 | ------ | ------ | ------ |
 | loadUrl | 兼容性好 | 1. 会刷新页面 2. 无法获取js方法执行结果 |
-| evaluateJavascript | 1. 性能好 2. 可获取返回值 | 仅在安卓4.4以上可用 |
+| evaluateJavascript | 1. 性能好 2. 可获取js执行后的返回值 | 仅在安卓4.4以上可用 |
 
 ## 2. js to native
 
@@ -37,4 +37,108 @@ mWebview.evaluateJavascript("javascript: func()", new ValueCallback<String>() {
 ##### Url Schema
 ##### 拦截 prompt alert confirm
 ##### addJavascriptInterface
-待续。。。
+
+#### 2.1 Url Schema
+即由 h5 发出一条新的跳转请求，跳转的目的地是一个非法不存在的URL地址，例如：
+
+```javascript
+"jsbridge://methodName?{"data": arg, "cbName": cbName}"
+```
+
+具体示例如下：
+
+```javascript
+"jsbridge://openScan?{"data": {"scanType": "qrCode"}, "cbName": "handleScanResult"}"
+```
+
+h5 和 native 约定一个通信协议，例如 jsbridge, 同时约定调用 native 的方法名 methodName 作为域名，以及后面带上调用该方法的参数 arg，和接收该方法执行结果的 js 方法名 cbName。
+
+具体可以在 js 端封装相关方法，供业务端统一调用，代码如下：
+
+```javascript
+window.callbackId = 0;
+
+function callNative(methodName, arg, cb) {
+    const args = {
+      data: arg === undefined ? null : JSON.stringify(arg),
+    };
+
+    if (typeof cb === 'function') {
+      const cbName = 'CALLBACK' + window.callbackId++;
+      window[cbName] = cb;
+      args['cbName'] = cbName;
+    }
+
+    const url = 'jsbridge://' + methodName + '?' + JSON.stringify(args);
+    ...
+}
+```
+以上封装中较为巧妙的是将用于接收 native 执行结果的 js 回调方法 cb 挂载到 window 上，并为防止命名冲突，通过全局的 callbackId 来区分，然后将该回调函数在 window 上的名字放在参数中传给 native 端。native 拿到 cbName 后，执行完方法后，将执行结果通过 native 调用 js 的方式（上面提到的两种方法），调用 cb 传给 h5 端（例如将扫描结果传给 h5）。
+
+至于如何在 h5 中发起请求，可以设置 window.location.href 或者创建一个新的 iframe 进行跳转。
+
+```javascript
+var url = 'jsbridge://' + method + '?' + JSON.stringify(args);
+
+// 通过 location.href 跳转
+window.location.href = url;
+
+// 通过创建新的 iframe 跳转
+var iframe = document.createElement('iframe');
+iframe.src = url;
+iframe.style.width = 0;
+iframe.style.height = 0;
+document.body.appendChild(iframe);
+
+window.setTimeout(function() {
+    document.body.removeChild(iframe);
+}, 800);
+```
+
+native 会拦截 h5 发出的请求，当检测到协议为 jsbridge 而非普通的 http/https/file 等协议时，会拦截该请求，解析出 URL 中的 methodName、arg、 cbName，执行该方法并调用 js 回调函数。
+
+下面以安卓为例，通过复写 WebViewClient 类的 shouldOverrideUrlLoading 方法进行拦截，具体封装会在下面单独说明。
+
+```java
+import android.util.Log;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+
+public class JSBridgeViewClient extends WebViewClient {
+    @Override
+    public boolean shouldOverrideUrlLoading(WebView view, String url) {
+        JSBridge.call(view, url);
+        return true;
+    }
+}
+```
+
+##### URL Schema 的问题
+
+- 连续发送时消息丢失
+
+如下代码：
+
+```javascript
+window.location.href = "jsbridge://callNativeNslog?{"data": "111", "cbName": ""}";
+window.location.href = "jsbridge://callNativeNslog?{"data": "222", "cbName": ""}";
+```
+
+js 此时的诉求是在同一个运行逻辑内，快速的连续发送出2个通信请求，用客户端本身IDE的log，按顺序打印111，222，那么实际结果是222的通信消息根本收不到，直接会被系统抛弃丢掉。
+
+原因：因为h5的请求归根结底是一种模拟跳转，跳转这件事情上 webview 会有限制，当 h5 连续发送多条跳转的时候，webview会直接过滤掉后发的跳转请求，因此第二个消息根本收不到，想要收到怎么办？js 里将第二条消息延时一下。
+
+```javascript
+//发第一条消息
+location.href = "jsbridge://callNativeNslog?{"data": "111", "cbName": ""}";
+
+//延时发送第二条消息
+setTimeout(500,function(){
+    location.href = "jsbridge://callNativeNslog?{"data": "222", "cbName": ""}";
+});
+```
+但这并不能保证此时是否有其他地方通过这种方式进行请求，为系统解决此问题，js 端可以封装一层队列，所有 js 代码调用消息都先进入队列并不立刻发送，然后 h5 会周期性比如500毫秒，清空一次队列，保证在很快的时间内绝对不会连续发2次请求通信。
+
+- URL长度限制
+
+如果需要传输的数据较长，例如方法参数很多时，由于URL长度限制，仍以丢失部分数据。
