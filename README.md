@@ -34,12 +34,15 @@ mWebview.evaluateJavascript("javascript: func()", new ValueCallback<String>() {
 ## 2. js to native
 
 三种 js 调用 native 方法
-##### Url Schema
+##### 拦截 Url Schema（假请求）
 ##### 拦截 prompt alert confirm
-##### addJavascriptInterface
+##### 注入 JS 上下文 addJavascriptInterface
 
-#### 2.1 Url Schema
-即由 h5 发出一条新的跳转请求，跳转的目的地是一个非法不存在的URL地址，例如：
+#### 2.1 拦截 Url Schema
+
+即由 h5 发出一条新的跳转请求，native 通过拦截 URL 获取 h5 传过来的数据。
+
+跳转的目的地是一个非法不存在的URL地址，例如：
 
 ```javascript
 "jsbridge://methodName?{"data": arg, "cbName": cbName}"
@@ -70,6 +73,7 @@ function callNative(methodName, arg, cb) {
     }
 
     const url = 'jsbridge://' + methodName + '?' + JSON.stringify(args);
+
     ...
 }
 ```
@@ -78,26 +82,30 @@ function callNative(methodName, arg, cb) {
 至于如何在 h5 中发起请求，可以设置 window.location.href 或者创建一个新的 iframe 进行跳转。
 
 ```javascript
-var url = 'jsbridge://' + method + '?' + JSON.stringify(args);
+function callNative(methodName, arg, cb) {
+    ...
 
-// 通过 location.href 跳转
-window.location.href = url;
+    const url = 'jsbridge://' + method + '?' + JSON.stringify(args);
 
-// 通过创建新的 iframe 跳转
-var iframe = document.createElement('iframe');
-iframe.src = url;
-iframe.style.width = 0;
-iframe.style.height = 0;
-document.body.appendChild(iframe);
+    // 通过 location.href 跳转
+    window.location.href = url;
 
-window.setTimeout(function() {
-    document.body.removeChild(iframe);
-}, 800);
+    // 通过创建新的 iframe 跳转
+    const iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.style.width = 0;
+    iframe.style.height = 0;
+    document.body.appendChild(iframe);
+
+    window.setTimeout(function() {
+        document.body.removeChild(iframe);
+    }, 800);
+}
 ```
 
 native 会拦截 h5 发出的请求，当检测到协议为 jsbridge 而非普通的 http/https/file 等协议时，会拦截该请求，解析出 URL 中的 methodName、arg、 cbName，执行该方法并调用 js 回调函数。
 
-下面以安卓为例，通过复写 WebViewClient 类的 shouldOverrideUrlLoading 方法进行拦截，具体封装会在下面单独说明。
+下面以安卓为例，通过覆盖 WebViewClient 类的 shouldOverrideUrlLoading 方法进行拦截，android 端具体封装会在下面单独的板块进行说明。
 
 ```java
 import android.util.Log;
@@ -139,6 +147,46 @@ setTimeout(500,function(){
 ```
 但这并不能保证此时是否有其他地方通过这种方式进行请求，为系统解决此问题，js 端可以封装一层队列，所有 js 代码调用消息都先进入队列并不立刻发送，然后 h5 会周期性比如500毫秒，清空一次队列，保证在很快的时间内绝对不会连续发2次请求通信。
 
-- URL长度限制
+- URL 长度限制
 
 如果需要传输的数据较长，例如方法参数很多时，由于URL长度限制，仍以丢失部分数据。
+
+
+#### 2.2 拦截 prompt alert confirm
+
+即由 h5 发起 alert confirm prompt，native 通过拦截 prompt 等获取 h5 传过来的数据。
+
+因为 alert confirm 比较常用，所以一般通过 prompt 进行通信。
+
+约定的传输数据的组合方式以及 js 端封装方法的可以类似上面的 拦截 URL Schema 提到的方式。
+
+```javascript
+function callNative(methodName, arg, cb) {
+    ...
+
+    const url = 'jsbridge://' + method + '?' + JSON.stringify(args);
+
+    prompt(url);
+}
+```
+
+native 会拦截 h5 发出的 prompt，当检测到协议为 jsbridge 而非普通的 http/https/file 等协议时，会拦截该请求，解析出 URL 中的 methodName、arg、 cbName，执行该方法并调用 js 回调函数。
+
+下面以安卓为例，通过覆盖 WebChromeClient 类的 onJsPrompt 方法进行拦截，android 端具体封装会在下面单独的板块进行说明。
+
+```java
+import android.webkit.JsPromptResult;
+import android.webkit.WebChromeClient;
+import android.webkit.WebView;
+
+public class JSBridgeChromeClient extends WebChromeClient {
+    @Override
+    public boolean onJsPrompt(WebView view, String url, String message, String defaultValue, JsPromptResult result) {
+        result.confirm(JSBridge.call(view, message));
+        return true;
+    }
+}
+```
+
+这种方式没有太大缺点，也不存在连续发送时信息丢失。不过 iOS 的 UIWebView 不支持该方式（WKWebView 支持）。
+
