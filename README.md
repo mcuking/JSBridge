@@ -36,7 +36,7 @@ mWebview.evaluateJavascript("javascript: func()", new ValueCallback<String>() {
 三种 js 调用 native 方法
 ##### 拦截 Url Schema（假请求）
 ##### 拦截 prompt alert confirm
-##### 注入 JS 上下文 addJavascriptInterface
+##### 注入 JS 上下文
 
 #### 2.1 拦截 Url Schema
 
@@ -121,7 +121,7 @@ public class JSBridgeViewClient extends WebViewClient {
 }
 ```
 
-##### URL Schema 的问题
+##### 拦截 URL Schema 的问题
 
 - 连续发送时消息丢失
 
@@ -190,3 +190,97 @@ public class JSBridgeChromeClient extends WebChromeClient {
 
 这种方式没有太大缺点，也不存在连续发送时信息丢失。不过 iOS 的 UIWebView 不支持该方式（WKWebView 支持）。
 
+
+#### 2.3 注入 JS 上下文
+
+即由 native 将实例对象通过 webview 提供的方法注入到 js 全局上下文，js 可以通过调用 native 的实例方法来进行通信。
+
+具体有安卓 webview 的 addJavascriptInterface，iOS UIWebview 的 JSContext，iOS WKWebview 的 scriptMessageHandler。
+
+下面以安卓 webview 的 addJavascriptInterface 为例进行讲解。
+
+首先 native 端注入实例对象到 js 全局上下文，代码大致如下，具体封装会在下面的单独板块进行讲解：
+
+```java
+public class MainActivity extends AppCompatActivity {
+
+    private WebView mWebView;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        mWebView = (WebView) findViewById(R.id.mWebView);
+
+        ...   
+
+        // 将 NativeMethods 类下面的提供给 js 的方法转换成 hashMap
+        JSBridge.register("JSBridge", NativeMethods.class);
+        
+        // 将 JSBridge 的实例对象注入到 js 全局上下文中，名字为 _jsbridge，该实例对象下有 call 方法
+        mWebView.addJavascriptInterface(new JSBridge(mWebView), "_jsbridge");
+    }
+}
+
+public class NativeMethods {
+    // 用来供 js 调用的方法
+    public static void methodName(WebView view, JSONObject arg, CallBack callBack) {
+    }
+}
+
+public class JSBridge {
+    private WebView mWebView;
+
+    public JSBridge(WebView webView) {
+        this.mWebView = webView;
+    }
+
+
+    private  static Map<String, HashMap<String, Method>> exposeMethods = new HashMap<>();
+
+    // 静态方法，用于将传入的第二个参数的类下面用于提供给 javacript 的接口转成 Map，名字为第一个参数
+    public static void register(String exposeName, Class<?> classz) {
+        ...
+    }
+
+    // 实例方法，用于提供给 js 统一调用的方法
+    @JavascriptInterface
+    public String call(String methodName, String args) {
+        ...
+    }
+}
+```
+
+然后 h5 端可以在 js 调用 window._jsbridge 实例下面的 call 方法，传入的数据组合方式可以类似上面两种方式。具体代码如下：
+
+``` javascript
+window.callbackId = 0;
+
+function callNative(method, arg, cb) {
+    let args = {
+        data: arg === undefined ? null : JSON.stringify(arg),
+    };
+
+    if (typeof cb === 'function') {
+        const cbName = 'CALLBACK' + window.callbackId++;
+        window[cbName] = cb;
+        args['cbName'] = cbName;
+    }
+
+    if (window._jsbridge) {
+        window._jsbridge.call(method, JSON.stringify(args));
+    }
+}
+```
+
+#####  注入 JS 上下文的问题
+
+以安卓 webview 的 addJavascriptInterface 为例，在安卓 4.2 版本之前，js 可以利用 java 的反射 Reflection API，取得构造该实例对象的类的內部信息，并能直接操作该对象的内部属性及方法，这种方式会造成安全隐患，例如如果加载了外部网页，该网页的恶意 js 脚本可以获取手机的存储卡上的信息。
+
+在安卓 4.2 版本后，可以通过在提供给 js 调用的 java 方法前加装饰器 @JavascriptInterface，来表明仅该方法可以被 js 调用。
+
+
+## 3. 安卓端 java 的封装
+
+待续。。。
