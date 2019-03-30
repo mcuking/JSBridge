@@ -1,8 +1,8 @@
-# mini-jsbridge
+# mini-JSBridge
 
-a simple jsbridge based on android
+a simple JSBridge based on android
 
-本项目以 js 与 android 通信为例，讲解 jsbridge 实现原理，下面提到的方法在iOS（UIWebview 或 WKWebview）均有对应方法。
+本项目以 js 与 android 通信为例，讲解 mini-JSBridge 实现原理，下面提到的方法在iOS（UIWebview 或 WKWebview）均有对应方法。
 
 ## 1. native to js
 两种 native 调用 js 方法，注意被调用的方法需要在 JS 全局上下文上
