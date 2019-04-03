@@ -43,7 +43,7 @@ public class JSBridge {
 
 
     public static String call(WebView webView, String urlString) {
-        if (!urlString.equals("") && urlString!=null&&urlString.startsWith("jsbridge")) {
+        if (!urlString.equals("") && urlString!=null && urlString.startsWith("jsbridge")) {
 
             Uri uri = Uri.parse(urlString);
 
