@@ -8,17 +8,17 @@ a simple JSBridge based on android
 
 两种 native 调用 js 方法，注意被调用的方法需要在 JS 全局上下文上
 
-##### loadUrl
+#### loadUrl
 
-##### evaluateJavascript
+#### evaluateJavascript
 
-#### 1.1 loadUrl
+### 1.1 loadUrl
 
 ```java
 mWebview.loadUrl("javascript: func()");
 ```
 
-#### 1.2 evaluateJavascript
+### 1.2 evaluateJavascript
 
 ```java
 mWebview.evaluateJavascript("javascript: func()", new ValueCallback<String>() {
@@ -40,13 +40,13 @@ mWebview.evaluateJavascript("javascript: func()", new ValueCallback<String>() {
 
 三种 js 调用 native 方法
 
-##### 拦截 Url Schema（假请求）
+#### 拦截 Url Schema（假请求）
 
-##### 拦截 prompt alert confirm
+#### 拦截 prompt alert confirm
 
-##### 注入 JS 上下文
+#### 注入 JS 上下文
 
-#### 2.1 拦截 Url Schema
+### 2.1 拦截 Url Schema
 
 即由 h5 发出一条新的跳转请求，native 通过拦截 URL 获取 h5 传过来的数据。
 
@@ -130,7 +130,7 @@ public class JSBridgeViewClient extends WebViewClient {
 }
 ```
 
-##### 拦截 URL Schema 的问题
+#### 拦截 URL Schema 的问题
 
 - 连续发送时消息丢失
 
@@ -161,7 +161,7 @@ setTimeout(500,function(){
 
 如果需要传输的数据较长，例如方法参数很多时，由于 URL 长度限制，仍以丢失部分数据。
 
-#### 2.2 拦截 prompt alert confirm
+### 2.2 拦截 prompt alert confirm
 
 即由 h5 发起 alert confirm prompt，native 通过拦截 prompt 等获取 h5 传过来的数据。
 
@@ -199,7 +199,7 @@ public class JSBridgeChromeClient extends WebChromeClient {
 
 这种方式没有太大缺点，也不存在连续发送时信息丢失。不过 iOS 的 UIWebView 不支持该方式（WKWebView 支持）。
 
-#### 2.3 注入 JS 上下文
+### 2.3 注入 JS 上下文
 
 即由 native 将实例对象通过 webview 提供的方法注入到 js 全局上下文，js 可以通过调用 native 的实例方法来进行通信。
 
@@ -282,7 +282,7 @@ function callNative(method, arg, cb) {
 }
 ```
 
-##### 注入 JS 上下文的问题
+#### 注入 JS 上下文的问题
 
 以安卓 webview 的 addJavascriptInterface 为例，在安卓 4.2 版本之前，js 可以利用 java 的反射 Reflection API，取得构造该实例对象的类的內部信息，并能直接操作该对象的内部属性及方法，这种方式会造成安全隐患，例如如果加载了外部网页，该网页的恶意 js 脚本可以获取手机的存储卡上的信息。
 
@@ -305,7 +305,7 @@ public class NativeMethods {
 接下来考虑如何在 NativeMethods 和 h5 之前建立一个桥梁，JSBridge 类因运而生。
 JSBridge 类下主要有两个静态方法 register 和 call。其中 register 方法是用来将供 h5 调用的方法转化成 Map 形式，以便查询。而 call 方法主要是用接收 h5 端的调用，分解 h5 端传来的参数，查找并调用 Map 中的对应的 Native 方法。
 
-##### JSBridge 类的静态方法 register
+#### JSBridge 类的静态方法 register
 
 首先在 JSBridge 类下声明一个静态属性 exposeMethods，数据类型为 HashMap 。然后声明静态方法 register，参数有字符串 exposeName 和类 classz，将 exposeName 和 classz 的所有静态方法 组合成一个 map，例如：
 
@@ -357,7 +357,7 @@ private static HashMap<String, Method> getAllMethod(Class injectedCls) {
 }
 ```
 
-##### JSBridge 类的静态方法 call
+#### JSBridge 类的静态方法 call
 
 由于注入 JS 上下文和两外两种，h5 端传过来的参数形式不同，所以处理参数的方式略有不同。
 下面以拦截 Prompt 的方式为例进行讲解，在该方式中 call 接收的第一个参数为 webView，第二个参数是 arg，即 h5 端传过来的参数。还记得拦截 Prompt 方式时 native 端和 h5 端约定的传输数据的方式么？
@@ -402,7 +402,7 @@ public static String call(WebView webView, String urlString) {
 }
 ```
 
-##### CallBack 类
+#### CallBack 类
 
 js 调用 native 方法成功后，native 有必要返回给 js 一些反馈，例如接口是否调用成功，或者 native 执行后的得到的数据（例如扫码）。所以 native 需要执行 js 回调函数。
 
