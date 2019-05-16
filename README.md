@@ -1,8 +1,8 @@
-# mini-JSBridge
+# JSBridge
 
 a simple JSBridge based on android
 
-本项目以 js 与 android 通信为例，讲解 mini-JSBridge 实现原理，下面提到的方法在 iOS（UIWebview 或 WKWebview）均有对应方法。
+本项目以 js 与 android 通信为例，讲解 JSBridge 实现原理，下面提到的方法在 iOS（UIWebview 或 WKWebview）均有对应方法。
 
 ## 1. native to js
 
@@ -445,7 +445,7 @@ public class CallBack {
 }
 ```
 
-到此为止，mini-JSBridge 的大致原理都讲完了。但功能仍可再加完善，例如：
+到此为止，JSBridge 的大致原理都讲完了。但功能仍可再加完善，例如：
 
 native 执行 js 方法时，可接受 js 方法中异步返回的数据，比如在 js 方法中请求某个接口在返回数据。直接调用 webview 提供的 evaluateJavascript，在第二个参数的类 ValueCallback 的实例方法 onReceiveValue 并不能接收到 js 异步返回的数据。
 
