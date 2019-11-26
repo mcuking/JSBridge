@@ -1,6 +1,6 @@
 # JSBridge
 
-a simple JSBridge based on android
+A demo JSBridge based on android
 
 本项目以 js 与 android 通信为例，讲解 JSBridge 实现原理，下面提到的方法在 iOS（UIWebview 或 WKWebview）均有对应方法。
 
@@ -14,11 +14,15 @@ a simple JSBridge based on android
 
 ### 1.1 loadUrl
 
+<img src="./assets/loadUrl.png" width=600/>
+
 ```java
 mWebview.loadUrl("javascript: func()");
 ```
 
 ### 1.2 evaluateJavascript
+
+<img src="./assets/evaluateJavascript.png" width=600/>
 
 ```java
 mWebview.evaluateJavascript("javascript: func()", new ValueCallback<String>() {
@@ -47,6 +51,8 @@ mWebview.evaluateJavascript("javascript: func()", new ValueCallback<String>() {
 #### 注入 JS 上下文
 
 ### 2.1 拦截 Url Schema
+
+<img src="./assets/intercept-url.png" width=600/>
 
 即由 h5 发出一条新的跳转请求，native 通过拦截 URL 获取 h5 传过来的数据。
 
@@ -163,6 +169,8 @@ setTimeout(500,function(){
 
 ### 2.2 拦截 prompt alert confirm
 
+<img src="./assets/intercept-prompt.png" width=600/>
+
 即由 h5 发起 alert confirm prompt，native 通过拦截 prompt 等获取 h5 传过来的数据。
 
 因为 alert confirm 比较常用，所以一般通过 prompt 进行通信。
@@ -200,6 +208,8 @@ public class JSBridgeChromeClient extends WebChromeClient {
 这种方式没有太大缺点，也不存在连续发送时信息丢失。不过 iOS 的 UIWebView 不支持该方式（WKWebView 支持）。
 
 ### 2.3 注入 JS 上下文
+
+<img src="./assets/addJavascriptInterface.png" width=600/>
 
 即由 native 将实例对象通过 webview 提供的方法注入到 js 全局上下文，js 可以通过调用 native 的实例方法来进行通信。
 
